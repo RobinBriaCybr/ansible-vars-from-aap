@@ -2,16 +2,12 @@
 - name: Connect to hosts using Conjur secrets
   hosts: all
   gather_facts: false
-  vars:
-    conjur_prefix: "data/vault/CYBR_UNIX_Administrators/AWS."
-    conjur_suffix: ".Unix"
-
   pre_tasks:
     - name: Resolve connection details locally
       set_fact:
-        ansible_user: "{{ lookup('cyberark.conjur.conjur_variable', conjur_prefix ~ '/' ~ inventory_hostname ~ conjur_suffix ~ '/username', validate_certs=false) }}"
-        ansible_host: "{{ lookup('cyberark.conjur.conjur_variable', conjur_base_path ~ '/' ~ inventory_hostname ~ '/address', validate_certs=false) }}"
-        ansible_ssh_private_key_file: "{{ lookup('cyberark.conjur.conjur_variable', conjur_base_path ~ '/' ~ inventory_hostname ~ conjur_suffix ~ '/password', validate_certs=false, as_file=true) }}"
+        ansible_user: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ '/' ~ inventory_hostname ~ conjur_path_suffix ~ '/username', validate_certs=false) }}"
+        ansible_host: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ '/' ~ inventory_hostname ~ conjur_path_suffix ~ '/address', validate_certs=false) }}"
+        ansible_ssh_private_key_file: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ '/' ~ inventory_hostname ~ conjur_path_suffix ~ '/password', validate_certs=false, as_file=true) }}"
       delegate_to: localhost
 
   tasks:
