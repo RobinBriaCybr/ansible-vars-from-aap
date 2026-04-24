@@ -4,4 +4,4 @@
   hosts: all
   tasks:
     - debug:
-        msg: "Var from AAP inventory: {{ ansible_ssh_private_key_file }}"
+        msg: "Var from AAP inventory: {{ ansible_user }}  + {{ ansible_ssh_private_key_file }}"

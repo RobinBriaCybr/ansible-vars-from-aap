@@ -1,15 +1,44 @@
 ---
-- name: Connect to hosts using Conjur secrets
+- name: Connect to hosts using Conjur secrets 
   hosts: all
   gather_facts: false
+
   pre_tasks:
-    - name: Resolve connection details locally
+    - name: "Step 1: Build the unique list of domain groups"
       set_fact:
-        ansible_user: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~  inventory_hostname ~ conjur_path_suffix ~ '/username', validate_certs=false) }}"
-        ansible_host: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ inventory_hostname ~ conjur_path_suffix ~ '/address', validate_certs=false) }}"
-        ansible_ssh_private_key_file: "{{ lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ inventory_hostname ~ conjur_path_suffix ~ '/password', validate_certs=false, as_file=true) }}"
+        unique_domain_groups: "{{ ansible_play_hosts | map('regex_replace', '^[^.]+\\.([^.]+).*$', '\\1') | unique | list }}"
+      run_once: true
       delegate_to: localhost
+      delegate_facts: true
+
+    - name: "Step 2: Fetch all credentials"
+      # On stocke les résultats bruts dans une variable 'secrets_raw'
+      set_fact:
+        secrets_raw: "{{ secrets_raw | default({}) | combine({
+            item: {
+              'user': lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ item ~ conjur_path_suffix ~ '/username', validate_certs=false),
+              'ip':   lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ item ~ conjur_path_suffix ~ '/address',  validate_certs=false),
+              'key':  lookup('cyberark.conjur.conjur_variable', conjur_path_prefix ~ item ~ conjur_path_suffix ~ '/password', validate_certs=false)
+            }
+          }) }}"
+      loop: "{{ hostvars['localhost']['unique_domain_groups'] }}"
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: "Step 3: Map values to each host"
+      vars:
+        my_group_key: "{{ inventory_hostname.split('.')[1] }}"
+      set_fact:
+        # On va chercher directement dans 'secrets_raw' sur localhost
+        ansible_user: "{{ hostvars['localhost']['secrets_raw'][my_group_key]['user'] }}"
+        ansible_host: "{{ hostvars['localhost']['secrets_raw'][my_group_key]['ip'] }}"
+        ansible_ssh_private_key_file: "{{ hostvars['localhost']['secrets_raw'][my_group_key]['key'] }}"
+      when: 
+        - hostvars['localhost']['secrets_raw'] is defined
+        - my_group_key in hostvars['localhost']['secrets_raw']
 
   tasks:
-    - name: Test SSH connection
-      ping:
+    - name: Final Verification
+      debug:
+        msg: "Host: {{ inventory_hostname }} | User: {{ ansible_user }} | Key: {{ ansible_ssh_private_key_file }}"
